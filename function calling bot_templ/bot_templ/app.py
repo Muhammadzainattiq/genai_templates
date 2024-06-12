@@ -58,7 +58,10 @@ def submit():
 # In production, this could be your backend API or an external API
 @tool
 def get_current_weather(location:str, unit:str="fahrenheit")->str:
-    """Get the current weather in a given location"""
+    """Get the current weather in a given location
+     Args:
+        location: The location for which the weather is required
+        unit: The unit of the temperature"""
     if "tokyo" in location.lower():
         return json.dumps({"location": "Tokyo", "temperature": "10", "unit": "celsius"})
     elif "san francisco" in location.lower():
@@ -79,14 +82,20 @@ chat = ChatOpenAI(
 
 chat_with_tools = chat.bind_tools(tools)
 
-# chat_with_tools_always = chat.bind_tools(tools, tool_choice="get_current_weather")this is if you want to make it compulsory to use a tool for the llm
+# chat_with_tools_always = chat.bind_tools(tools, tool_choice="get_current_weather")
 def build_message_list():
     """
     Build a list of messages including system, human and AI messages.
     """
     # Start zipped_messages with the SystemMessage
     zipped_messages = [SystemMessage(
-        content = """you're a helpful assistant."""
+        content = """you're a helpful assistant to help user get the weather details. you can only do three things:
+        1_provide use information about yourself what you can do.
+        2_Greet the users. Don't say Hi. Always say Assalam o Alaikum even if the user say Hi. 
+        3_Tell the users about the weather about their asked location using the functions you have.
+        
+        Once you perfrom the greeting. Tell the user your purpose and Direclty ask the user about the location for which he want to ask the weather.
+        And if a user ask anything other than that tell him that you are only developed to answer the weather related queries."""
     )]
 
     # Zip together the past and generated messages
@@ -109,15 +118,21 @@ def generate_response():
 
     # Generate response using the chat model
     ai_response = chat_with_tools.invoke(messages)
+    print("ai-response:::::::::::::::", ai_response)
     messages.append(ai_response)
     # Handle tool calls if any
     for tool_call in ai_response.tool_calls:
         selected_tool = {"get_current_weather": get_current_weather}[tool_call["name"].lower()]
         tool_output = selected_tool.invoke(tool_call["args"])
+        print("tool_output", tool_output)
         messages.append(ToolMessage(tool_output, tool_call_id=tool_call["id"]))
 
     response = chat_with_tools.invoke(messages)
+    print("response: ", response)
     response = response.content
+    #sometime the llm calls for a function but it don't receive anything from those fucntions so the response is a empty string. So the following code is cope with this situation.
+    if response == "":
+        response = "I am a helpful assistant here to provide you with weather details. How can I assist you today? What location's weather would you like to know about?"
     return response
 
 # Create a text input for user
